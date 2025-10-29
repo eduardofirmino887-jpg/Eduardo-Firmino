@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Transaction, OperationType, PalletTransaction, PalletOperationType, PalletProfile, User, TransactionFilters, PalletFilters, Ocorrencia, OcorrenciaOperation, OcorrenciaStatus, OcorrenciaFilters } from './types';
 import Dashboard from './components/Dashboard';
@@ -690,6 +691,8 @@ const App: React.FC = () => {
           users={users} // Pass users to LiveChat
           onAddUser={addUser} // Pass addUser to LiveChat
           onDeleteUser={deleteUser} // Pass deleteUser to LiveChat
+          transactions={transactions} // Pass transactions for analysis
+          palletTransactions={palletTransactions} // Pass pallet transactions for analysis
         />
       ); // Pass new functions to LiveChat
       default: return null;

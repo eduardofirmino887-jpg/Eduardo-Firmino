@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 
 export const ChartPieIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -151,6 +152,13 @@ export const MicrophoneIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 6a6 6 0 01-6-6v-1.5m6 6v3.75m-3 0h6m-1.5-12.75a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 );
+
+export const SparklesIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.71L18 9.75l-.259-1.04a1.875 1.875 0 00-1.408-1.408L15.25 7l1.04-.259a1.875 1.875 0 001.408-1.408L18 4.25l.259 1.04a1.875 1.875 0 001.408 1.408L20.75 7l-1.04.259a1.875 1.875 0 00-1.408 1.408zM18 15.75l.259 1.04a1.875 1.875 0 001.408 1.408L20.75 19l-1.04.259a1.875 1.875 0 00-1.408 1.408L18 21.75l-.259-1.04a1.875 1.875 0 00-1.408-1.408L15.25 19l1.04-.259a1.875 1.875 0 001.408-1.408z" />
+  </svg>
+);
+
 
 // Removed PaperAirplaneIcon
 

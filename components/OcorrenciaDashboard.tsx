@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Ocorrencia, View, OcorrenciaFilters, OcorrenciaStatus } from '../types';
 import { Card } from './ui/Card';

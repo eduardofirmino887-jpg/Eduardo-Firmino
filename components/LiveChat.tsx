@@ -1,10 +1,12 @@
 
 
 
+
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Blob as GenAIBlob, FunctionDeclaration, Type } from '@google/genai';
 import { Button } from './ui/Button';
-import { MicrophoneIcon, XIcon, PlayIcon, PaperclipIcon, QuestionMarkCircleIcon } from './Icons';
+import { MicrophoneIcon, XIcon, PlayIcon, PaperclipIcon, QuestionMarkCircleIcon, SparklesIcon } from './Icons';
 import { OperationType, Transaction, PalletOperationType, PalletProfile, PalletTransaction, User } from '../types';
 
 interface LiveChatProps {
@@ -18,9 +20,11 @@ interface LiveChatProps {
   users: User[]; // Added for user management
   onAddUser: (user: Omit<User, 'id'>) => void; // Added for user management
   onDeleteUser: (id: string) => void; // Added for user management
+  transactions: Transaction[];
+  palletTransactions: PalletTransaction[];
 }
 
-type LiveChatTab = 'chat' | 'attachFile';
+type LiveChatTab = 'chat' | 'attachFile' | 'analysis';
 
 // === Audio Utility Functions (from guidelines) ===
 function decode(base64: string): Uint8Array {
@@ -331,6 +335,8 @@ const LiveChat: React.FC<LiveChatProps> = ({
   users, // Destructure new prop
   onAddUser, // Destructure new prop
   onDeleteUser, // Destructure new prop
+  transactions,
+  palletTransactions,
 }) => {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [currentInputTranscription, setCurrentInputTranscription] = useState<string>('');
@@ -355,7 +361,7 @@ const LiveChat: React.FC<LiveChatProps> = ({
   const currentOutputAudioChunksRef = useRef<Uint8Array[]>([]);
   const currentPlayingSourceRef = useRef<AudioBufferSourceNode | null>(null); // To manage single playback for history
 
-  // New state for file attachment
+  // State for tabs and file attachment
   const [activeLiveChatTab, setActiveLiveChatTab] = useState<LiveChatTab>('chat');
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [attachedFileBase64, setAttachedFileBase64] = useState<string | null>(null);
@@ -363,6 +369,11 @@ const LiveChat: React.FC<LiveChatProps> = ({
   const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
   const [fileAnalysisLoading, setFileAnalysisLoading] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // State for complex analysis tab
+  const [analysisInput, setAnalysisInput] = useState<string>('');
+  const [analysisHistory, setAnalysisHistory] = useState<{role: 'user' | 'model', text: string}[]>([]);
+  const [analysisLoading, setAnalysisLoading] = useState<boolean>(false);
 
 
   // Request microphone permission on mount
@@ -947,11 +958,58 @@ const LiveChat: React.FC<LiveChatProps> = ({
     }
     addToast('Arquivo anexado limpo.', 'info');
   }, [addToast]);
+  
+  const handleAnalysisSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!analysisInput.trim() || analysisLoading) return;
+
+      setAnalysisLoading(true);
+      const currentInput = analysisInput;
+      setAnalysisHistory(prev => [...prev, { role: 'user', text: currentInput }]);
+      setAnalysisInput('');
+
+      try {
+        if (!aiRef.current) {
+          aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        }
+
+        const prompt = `Você é Verônica, uma especialista em análise de dados logísticos.
+        Aqui estão os dados atuais de movimentação de filme stretch (transactions):
+        ${JSON.stringify(transactions.slice(0, 50), null, 2)}
+        (Nota: Apenas as 50 transações mais recentes de filme stretch foram incluídas para economizar espaço)
+
+        Aqui estão os dados atuais de movimentação de paletes (palletTransactions):
+        ${JSON.stringify(palletTransactions.slice(0, 50), null, 2)}
+        (Nota: Apenas as 50 transações mais recentes de paletes foram incluídas para economizar espaço)
+
+        Com base nesses dados, por favor, analise e responda à seguinte pergunta do usuário: "${currentInput}"
+        Seja detalhada, forneça insights e, se apropriado, formate sua resposta usando markdown (negrito, listas, etc.).`;
+
+        const response = await aiRef.current.models.generateContent({
+          model: 'gemini-2.5-pro',
+          contents: prompt,
+          config: {
+            thinkingConfig: { thinkingBudget: 32768 },
+          },
+        });
+
+        const aiResponseText = response.text;
+        setAnalysisHistory(prev => [...prev, { role: 'model', text: aiResponseText }]);
+
+      } catch (error: any) {
+        console.error("Error during complex analysis:", error);
+        const errorMessage = `Desculpe, ocorreu um erro ao processar sua análise: ${error.message || 'Erro desconhecido'}`;
+        addToast(errorMessage, 'error');
+        setAnalysisHistory(prev => [...prev, { role: 'model', text: errorMessage }]);
+      } finally {
+        setAnalysisLoading(false);
+      }
+  };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <div className="bg-slate-800 p-8 rounded-3xl shadow-xl h-[calc(100vh-180px)] flex flex-col">
-        <h2 className="text-xl font-semibold text-slate-100 mb-6 text-center">Chat de Voz com Verônica</h2>
+        <h2 className="text-xl font-semibold text-slate-100 mb-6 text-center">Chat com Verônica</h2>
 
         {errorMessage && (
           <div className="bg-accent-error/10 border-l-4 border-accent-error text-red-300 p-4 mb-6 rounded-md" role="alert">
@@ -971,18 +1029,26 @@ const LiveChat: React.FC<LiveChatProps> = ({
                 <MicrophoneIcon className="w-5 h-5" /> Chat de Voz
             </button>
             <button
+                onClick={() => setActiveLiveChatTab('analysis')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold rounded-t-lg transition-colors duration-200 ${activeLiveChatTab === 'analysis' ? 'bg-slate-800 text-primary-500 border-b-2 border-primary-500' : 'text-slate-400 hover:text-slate-200'}`}
+                aria-selected={activeLiveChatTab === 'analysis'}
+                role="tab"
+            >
+                <SparklesIcon className="w-5 h-5" /> Análise Avançada
+            </button>
+            <button
                 onClick={() => setActiveLiveChatTab('attachFile')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold rounded-t-lg transition-colors duration-200 ${activeLiveChatTab === 'attachFile' ? 'bg-slate-800 text-primary-500 border-b-2 border-primary-500' : 'text-slate-400 hover:text-slate-200'}`}
                 aria-selected={activeLiveChatTab === 'attachFile'}
                 role="tab"
             >
-                <PaperclipIcon className="w-5 h-5" /> Anexar um Arquivo
+                <PaperclipIcon className="w-5 h-5" /> Anexar Arquivo
             </button>
         </div>
 
         {activeLiveChatTab === 'chat' && (
             <>
-                <div className="flex-1 overflow-y-auto pr-4 mb-4 space-y-4 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto pr-4 mb-4 space-y-4">
                 {historyEntries.length === 0 && !currentInputTranscription && !currentOutputTranscription && !loading && (
                     <p className="text-center text-slate-400 italic mt-10">
                     Pressione o botão para iniciar uma conversa com a Verônica. Tente dizer "Adicionar uma entrada de 100 kg de filme stretch com nota fiscal XYZ" ou "Adicionar entrada de 50 PBR com cliente ABC" ou "Me conte uma piada".
@@ -1069,6 +1135,57 @@ const LiveChat: React.FC<LiveChatProps> = ({
                   </button>
                 </div>
             </>
+        )}
+
+        {activeLiveChatTab === 'analysis' && (
+          <>
+            <div className="flex-1 overflow-y-auto pr-4 mb-4 space-y-4">
+                {analysisHistory.length === 0 && !analysisLoading && (
+                    <div className="text-center text-slate-400 italic mt-10">
+                        <SparklesIcon className="h-12 w-12 mx-auto text-slate-500 mb-4" />
+                        <p>Faça uma pergunta complexa sobre seus dados logísticos.</p>
+                        <p>A Verônica usará o modo de pensamento avançado para uma análise profunda.</p>
+                        <p className="mt-4 text-xs">Ex: "Qual foi o dia de maior consumo de filme stretch e qual cliente esteve associado a mais saídas de paletes nesse mesmo dia?"</p>
+                    </div>
+                )}
+                {analysisHistory.map((entry, index) => (
+                    <div key={index} className={`flex ${entry.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] p-3 rounded-2xl shadow-sm ${
+                            entry.role === 'user'
+                                ? 'bg-primary-600 text-white rounded-br-none'
+                                : 'bg-slate-700 text-slate-200 rounded-bl-none'
+                        }`}>
+                            <p className="whitespace-pre-wrap">{entry.text}</p>
+                        </div>
+                    </div>
+                ))}
+                 {analysisLoading && analysisHistory[analysisHistory.length - 1]?.role === 'user' && (
+                    <div className="flex justify-start">
+                        <div className="max-w-[85%] p-3 rounded-2xl shadow-sm bg-slate-700 text-slate-200 rounded-bl-none">
+                            <div className="animate-pulse flex space-x-2">
+                                <div className="h-2 w-2 bg-slate-400 rounded-full"></div>
+                                <div className="h-2 w-2 bg-slate-400 rounded-full"></div>
+                                <div className="h-2 w-2 bg-slate-400 rounded-full"></div>
+                                <span className="text-sm text-slate-400">Analisando...</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <form onSubmit={handleAnalysisSubmit} className="mt-auto flex gap-2">
+              <textarea
+                value={analysisInput}
+                onChange={(e) => setAnalysisInput(e.target.value)}
+                placeholder="Digite sua pergunta aqui..."
+                disabled={analysisLoading}
+                rows={2}
+                className="flex-grow p-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:ring-2 focus:ring-primary-500 outline-none resize-none"
+              />
+              <Button type="submit" disabled={analysisLoading || !analysisInput.trim()} className="w-auto px-4 py-2 !rounded-xl">
+                {analysisLoading ? '...' : 'Enviar'}
+              </Button>
+            </form>
+          </>
         )}
 
         {activeLiveChatTab === 'attachFile' && (
