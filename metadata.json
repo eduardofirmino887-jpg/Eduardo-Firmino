@@ -1,0 +1,9 @@
+{
+  "name": "Stretch Film Logistics Control",
+  "description": "A comprehensive logistics system for tracking and managing stretch film inventory, including entries, exits, costs, and stock balance, complete with an analytical dashboard.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
